@@ -29,7 +29,7 @@ class ODERobot
   ~ODERobot();
   void Create(dWorldID worldID);
   void Clear();
-  void EnableSelfCollisions(bool enabled);
+  void EnableSelfCollisions(bool enabled) { enable_col = enabled; }
   bool SelfCollisionsEnabled() const;
   void SetConfig(const Config& q);
   void GetConfig(Config& q) const;
@@ -77,6 +77,7 @@ class ODERobot
   vector<dJointFeedback> jointFeedback;
   dJointGroupID jointGroupID;
   dSpaceID spaceID;
+ bool enable_col;
 };
 
 #endif

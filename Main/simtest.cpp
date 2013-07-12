@@ -1582,6 +1582,17 @@ int main(int argc, char** argv)
     }
   }
 
+  for(int i=0; i<world.robots.size(); i++)
+  {
+      SmartPointer<Robot> rob = world.robots[i].robot;
+
+      for(int j=0; j<rob->joints.size(); j++)
+      {
+          int link_index = rob->joints[j].linkIndex;
+          printf("%s, %d\n", rob->linkNames[link_index].c_str(), link_index);
+      }
+  }
+
   return program.Run();
 }
 
