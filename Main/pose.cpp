@@ -32,6 +32,7 @@ enum {
   SAVE_PATH_CONFIGS_ID,
   OPTIMIZE_PATH_ID,
   SAVE_MOVIE_BUTTON_ID,
+  PLAY_PATH_ID,
   POSE_IK_TOGGLED_ID,
   LINK_SPINNER_ID,
   LINK_LISTBOX_ID,
@@ -62,6 +63,9 @@ public:
   RobotPoseWidget poseWidget;
   int pose_ik;
   int draw_geom,draw_com,draw_frame;
+
+  vector<Real> file_times;
+  vector<Vector> file_milestones;
 
   RobotPoseProgram(RobotWorld* world)
     :ResourceBrowserProgram(world)
@@ -100,6 +104,7 @@ public:
     glui->add_column_to_panel(panel,false);
     glui->add_button_to_panel(panel,"Optimize path",OPTIMIZE_PATH_ID,ControlFunc);
     glui->add_button_to_panel(panel,"Save movie",SAVE_MOVIE_BUTTON_ID,ControlFunc);
+    glui->add_button_to_panel(panel,"Play file path",PLAY_PATH_ID,ControlFunc);
 
     panel = glui->add_rollout("Link controls");
     link_spinner = glui->add_spinner_to_panel(panel,"Index",GLUI_SPINNER_INT,&cur_link,LINK_SPINNER_ID,ControlFunc);
@@ -146,20 +151,20 @@ public:
   
   void UpdateConfig()
   {
-    Robot* robot = world->robots[0].robot;
-    robot->UpdateConfig(poseWidget.Pose());
+      Robot* robot = world->robots[0].robot;
+      robot->UpdateConfig(poseWidget.Pose());
 
-    //update collisions
-    for(size_t i=0;i<robot->links.size();i++)
-      self_colliding[i]=false;
-    robot->UpdateGeometry();
-    for(size_t i=0;i<robot->links.size();i++) {
-      for(size_t j=0;j<robot->links.size();j++) {
-	if(robot->SelfCollision(i,j)) {
-	  self_colliding[i]=self_colliding[j]=true;
-	}
+      //update collisions
+      for(size_t i=0;i<robot->links.size();i++)
+          self_colliding[i]=false;
+      robot->UpdateGeometry();
+      for(size_t i=0;i<robot->links.size();i++) {
+          for(size_t j=0;j<robot->links.size();j++) {
+              if(robot->SelfCollision(i,j)) {
+                  self_colliding[i]=self_colliding[j]=true;
+              }
+          }
       }
-    }
   }
 
   void UpdateLinkSpinnerGUI()
@@ -392,6 +397,18 @@ public:
   {
     Robot* robot = world->robots[0].robot;
     switch(id) {
+    case PLAY_PATH_ID: 
+    {
+        cout << "play path" << endl;
+        MultiPath path;
+        //path.SetMilestones(milestones);
+        path.SetTimedMilestones( file_times, file_milestones );
+        ResourceBrowserProgram::Add("",path);
+        ResourceBrowserProgram::SetLastActive();
+        ResourceBrowserProgram::viewResource.pathTime = 0;
+        Refresh();
+    }
+        break;
     case SAVE_MOVIE_BUTTON_ID:
       //resize for movie
       {
@@ -825,6 +842,30 @@ public:
     MovieUpdate(ResourceBrowserProgram::viewResource.pathTime+1e-5);
     ResourceBrowserProgram::Handle_Idle();
   }
+
+  bool LoadLinearPath(const char* fn)
+  {
+      ifstream in(fn,ios::in);
+      if(!in) {
+          printf("Warning, couldn't open file %s\n",fn);
+          return false;
+      }
+      Real t;
+      Vector x;
+      while(in) {
+          in >> t >> x;
+          if(in) {
+              file_times.push_back(t);
+              file_milestones.push_back(x);
+          }
+      }
+      if(in.bad()) {
+          printf("Error during read of file %s\n",fn);
+          return false;
+      }
+      in.close();
+      return true;
+  }
 };
 
 const char* USAGE_STRING = "Usage: RobotPose [options] [robot, terrain, object, world files]\n";
@@ -939,6 +980,25 @@ int main(int argc, char** argv)
   world.lights[0].setColor(GLColor(1,1,1));
   RobotPoseProgram program(&world);
   if(!program.LoadCommandLine(argc,argv)) return 1;
+
+  vector<string> paths;
+
+  for(int i=1;i<argc;i++) {
+      if(argv[i][0] == '-') {
+          if(0==strcmp(argv[i],"-path")) {
+              paths.push_back(argv[i+1]);
+              i++;
+          }
+      }
+  }
+
+  if(!paths.empty()) {
+      const char* ext=FileExtension(paths[0].c_str());
+      if(!program.LoadLinearPath(paths[0].c_str())) {
+          fprintf(stderr,"Couldn't load linear path file %s\n",paths[0].c_str());
+          return 1;
+      }
+  }
 
   //debugging limb shrinking for yajia
   /*

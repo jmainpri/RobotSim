@@ -148,58 +148,59 @@ inline bool LoadItem(const char* fn,ResourceLibrary& lib)
 
 bool ResourceBrowserProgram::LoadCommandLine(int argc,char** argv)
 {
-  for(int i=1;i<argc;i++) {
-    if(argv[i][0] == '-') {
-      if(0==strcmp(argv[i],"-l")) {
-	LoadResources(argv[i+1],resources);
-	i++;
-      }
-      else {
-	printf("Unknown option %s",argv[i]);
-	return 0;
-      }
+    for(int i=1;i<argc;i++)
+    {
+        if(argv[i][0] == '-') {
+            if(0==strcmp(argv[i],"-l")) {
+                LoadResources(argv[i+1],resources);
+                i++;
+            }
+            else {
+                printf("Unknown option %s\n",argv[i]);
+                return true;
+            }
+        }
+        else {
+            const char* ext=FileExtension(argv[i]);
+            if(0==strcmp(ext,"xml")) {
+                TiXmlDocument doc;
+                if(!doc.LoadFile(argv[i])) {
+                    printf("Error loading XML file %s\n",argv[i]);
+                    return false;
+                }
+                if(0 == strcmp(doc.RootElement()->Value(),"world")) {
+                    XmlWorld xmlWorld;
+                    if(!xmlWorld.Load(doc.RootElement(),GetFilePath(argv[i]))) {
+                        printf("Error loading world file %s\n",argv[i]);
+                        return false;
+                    }
+                    if(!xmlWorld.GetWorld(*world)) {
+                        printf("Error loading world from %s\n",argv[i]);
+                        return false;
+                    }
+                }
+                else if(0 == strcmp(doc.RootElement()->Value(),"resource_library")) {
+                    LoadResources(doc.RootElement(),resources);
+                }
+                else {
+                    if(!LoadItem(argv[i],resources))
+                        return false;
+                }
+            }
+            else {
+                //try loading into the world
+                if(world->LoadElement(argv[i])>= 0) {
+                    //loaded successfully
+                }
+                else {
+                    //failed, now try resource library load
+                    if(!LoadItem(argv[i],resources))
+                        return false;
+                }
+            }
+        }
     }
-    else {
-      const char* ext=FileExtension(argv[i]);
-      if(0==strcmp(ext,"xml")) {
-	TiXmlDocument doc;
-	if(!doc.LoadFile(argv[i])) {
-	  printf("Error loading XML file %s\n",argv[i]);
-	  return false;
-	}
-	if(0 == strcmp(doc.RootElement()->Value(),"world")) {
-	  XmlWorld xmlWorld;
-	  if(!xmlWorld.Load(doc.RootElement(),GetFilePath(argv[i]))) {
-	    printf("Error loading world file %s\n",argv[i]);
-	    return 0;
-	  }
-	  if(!xmlWorld.GetWorld(*world)) {
-	    printf("Error loading world from %s\n",argv[i]);
-	    return 0;
-	  }
-	}
-	else if(0 == strcmp(doc.RootElement()->Value(),"resource_library")) {
-	  LoadResources(doc.RootElement(),resources);
-	}
-	else {
-	  if(!LoadItem(argv[i],resources))
-	    return 0;
-	}
-      }
-      else {
-	//try loading into the world
-	if(world->LoadElement(argv[i])>= 0) {
-	  //loaded successfully
-	}
-	else {
-	  //failed, now try resource library load
-	  if(!LoadItem(argv[i],resources))
-	    return 0;
-	}
-      }
-    }
-  }
-  return true;
+    return true;
 }
 
 void ResourceBrowserProgram::AddGLUIControls(GLUI* glui,bool rollout)

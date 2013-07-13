@@ -844,28 +844,35 @@ public:
     return SendLinearPath(times,milestones);
   }
 
-  bool SendLinearPath(const vector<Real>& times,const vector<Config>& milestones) 
+  bool SendLinearPath(const vector<Real>& times,const vector<Config>& milestones)
   {
-    Assert(sim.robotControllers.size()>=1);
-    if(sim.robotControllers.size()>1)
-      printf("Warning, sending path to robot 0 by default\n");
-    for(size_t i=0;i<milestones.size();i++) {
-      stringstream ss;
-      ss<<sim.time+times[i]<<"\t"<<milestones[i];
-      if(i==0) {
-	if(!sim.robotControllers[0]->SendCommand("set_tq",ss.str())) {
-	  fprintf(stderr,"set_tq command does not work with the robot's controller\n");
-	  return false;
-	}
+      Assert(sim.robotControllers.size()>=1);
+
+      if(sim.robotControllers.size()>1)
+          printf("Warning, sending path to robot 0 by default\n");
+
+      printf( "Send linear path to controller\n" );
+      //printf( "--> : %s\n", typeid(*sim.robotControllers[0]).name() );
+
+      for(size_t i=0;i<milestones.size();i++)
+      {
+          stringstream ss;
+          ss<<sim.time+times[i]<<"\t"<<milestones[i];
+          if(i==0) {
+              if(!sim.robotControllers[0]->SendCommand("set_tq",ss.str())) {
+                  fprintf(stderr,"set_tq command does not work with the robot's controller\n");
+                  return false;
+              }
+          }
+          else {
+              if(!sim.robotControllers[0]->SendCommand("append_tq",ss.str())) {
+                  fprintf(stderr,"append_tq command does not work with the robot's controller\n");
+                  return false;
+              }
+          }
       }
-      else {
-	if(!sim.robotControllers[0]->SendCommand("append_tq",ss.str())) {
-	  fprintf(stderr,"append_tq command does not work with the robot's controller\n");
-	  return false;
-	}
-      }
-    }
-    return true;
+      printf( "End sending path\n" );
+      return true;
   }
 
   virtual void Handle_Control(int id)
@@ -1466,28 +1473,28 @@ int main(int argc, char** argv)
   world.lights[0].setColor(GLColor(1,1,1));
 
   for(int i=1;i<argc;i++) {
-    if(argv[i][0] == '-') {
-      if(0==strcmp(argv[i],"-path")) {
-	paths.push_back(argv[i+1]);
-	i++;
+      if(argv[i][0] == '-') {
+          if(0==strcmp(argv[i],"-path")) {
+              paths.push_back(argv[i+1]);
+              i++;
+          }
+          else if(0==strcmp(argv[i],"-state")) {
+              states.push_back(argv[i+1]);
+              i++;
+          }
+          else if(0==strcmp(argv[i],"-milestones")) {
+              milestones.push_back(argv[i+1]);
+              i++;
+          }
+          else if(0==strcmp(argv[i],"-config")) {
+              configs.push_back(argv[i+1]);
+              i++;
+          }
+          else {
+              printf("Unknown option %s",argv[i]);
+              return 1;
+          }
       }
-      else if(0==strcmp(argv[i],"-state")) {
-	states.push_back(argv[i+1]);
-	i++;
-      }
-      else if(0==strcmp(argv[i],"-milestones")) {
-	milestones.push_back(argv[i+1]);
-	i++;
-      }
-      else if(0==strcmp(argv[i],"-config")) {
-	configs.push_back(argv[i+1]);
-	i++;
-      }
-      else {
-	printf("Unknown option %s",argv[i]);
-	return 1;
-      }
-    }
     else {
       const char* ext=FileExtension(argv[i]);
       if(0==strcmp(ext,"xml")) {
