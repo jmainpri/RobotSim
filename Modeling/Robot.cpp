@@ -110,6 +110,8 @@ bool Robot::LoadRob(const char* fn) {
 	vector<int> geomTransformIndex;
 	vector<Matrix4> geomTransform;
 
+    name = fn;
+
 	ifstream in(fn, ios::in);
 	if (!in)
 		return false;
