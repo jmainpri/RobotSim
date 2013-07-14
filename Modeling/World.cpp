@@ -166,6 +166,8 @@ int RobotWorld::LoadRobot(const string& fn)
   StripExtension(buf);
   string name=buf;
   delete [] buf;
+  robot->name = name;
+  cout << "Loading : " << name << endl;
   int i = AddRobot(name,robot);
   return i;
 }
