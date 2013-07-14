@@ -4,7 +4,7 @@
 #include "Controller.h"
 #include <utils/SmartPointer.h>
 
-/** @brief A controllre that saves/replays low-level commands from disk.
+/** @brief A controller that saves/replays low-level commands from disk.
  *
  * Use the boolean flags 'save' and 'replay' to control the logging. 
  * 'Replay' overrides the base controller's normal update function.
