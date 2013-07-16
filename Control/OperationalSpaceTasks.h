@@ -115,4 +115,174 @@ protected:
     Eigen::VectorXd _eI;
 };
 
+//! Center of Mass position task subclass
+class COMTask : public Task
+{
+    COMTask();
+
+    double GetMass(self);
+
+    //! Returns CoM position
+    Eigen::Vector GetSensedValue(Eigen::VectorXd q);
+
+    //! Returns axis-weighted CoM Jacobian by averaging
+    Eigen::Vector getJacobian(Eigen::VectorXd q);
+
+    void DrawGL(Eigen::VectorXd q);
+
+private:
+    double _mass;
+    std::string _name;
+    int baseLinkNo = baseLinkNo;
+};
+
+//! Link position/orientation task subclass.
+//! Supports both absolute and relative positioning.
+class LinkTask : public Task
+{
+    LinkTask();
+    Eigen::VectorXd GetSensedValue( Eigen::VectorXd q );
+    Eigen::VectorXd TaskDifference( Eigen::VectorXd a, Eigen::VectorXd b);
+    Eigen::VectorXd GetJacobian( Eigen::VectorXd q );
+    Eigen::VectorXd DrawGL(Eigen::VectorXd q);
+
+private:
+
+    int _linkNo;
+    int _baseLinkNo;
+    Robot _robot;
+//    self.hP = -1
+//    self.hD = 0
+//    self.hI = 0
+    Eigen::VectorXd _localPosition;
+    std::string _taskType;
+    std::string _name = "Link";
+};
+
+/*
+class JointTask(Task):
+    """A joint angle task class
+    """
+    def __init__(self, robot, jointIndices):
+        Task.__init__(self)
+        self.robot = robot
+        self.jointIndices = jointIndices
+        self.name = "Joint"
+        pass
+
+    def getSensedValue(self, q):
+        return [q[jointi] for jointi in self.jointIndices]
+
+    def getJacobian(self, q):
+        J = []
+        for jointi in self.jointIndices:
+            Ji = [0] * self.robot.numLinks()
+            Ji[jointi] = 1
+            J.append(Ji)
+        return J
+
+class JointLimitTask(Task):
+    def __init__(self,robot):
+        Task.__init__(self)
+        self.robot = robot
+        self.buffersize = 2.0
+        self.qmin,self.qmax = robot.getJointLimits()
+        self.accelMax = robot.getAccelerationLimits()
+        self.wscale = 0.1
+        self.maxw = 10
+        self.active = []
+        self.weight = 0
+        self.xdes = []
+        self.dxdes = []
+        self.name = "Joint limits"
+        self.setGains(-0.1,-2.0,0)
+
+
+    def updateState(self, q, dq, dt):
+        """ check (q, dq) against joint limits
+        Activates joint limit constraint, i.e., add a joint task
+        to avoid reaching limit, when surpassing a threshold.
+
+        Or, increase weight on this joint task as joint gets closer to its limit.
+
+        """
+        self.active = []
+        self.weight = []
+        self.xdes = []
+        self.dxdes = []
+        buffersize = self.buffersize
+        wscale = self.wscale
+        maxw = self.maxw
+        for i,(j,dj,jmin,jmax,amax) in enumerate(zip(q,dq,self.qmin,self.qmax,self.accelMax)):
+            if jmax <= jmin: continue
+            jstop = j
+            a = amax / buffersize
+            w = 0
+            ades = 0
+            if dj > 0.0:
+                t = dj / a
+                    #j + t*dj - t^2*a/2
+                jstop = j + t*dj - t*t*a*0.5
+                if jstop > jmax:
+                    #add task to slow down
+                        #perfect accel solves for:
+                        #j+ dj^2 / 2a  = jmax
+                        #dj^2 / 2(jmax-j)   = a
+                    if j >= jmax:
+                        print "Joint",self.robot.getLink(i).getName(),"exceeded max",j,">=",jmax
+                        ades = -amax
+                        w = maxw
+                    else:
+                        alim = dj*dj/(jmax-j)*0.5
+                        if alim > amax:
+                            ades = -amax
+                            w = maxw
+                        else:
+                            ades = -alim
+                            w = wscale*(alim-a)/(amax-alim)
+                        #print "Joint",self.robot.getLink(i).getName(),j,dj,"near upper limit",jmax,", desired accel:",ades," weight",w
+            else:
+                t = -dj / a
+                    #j + t*dj + t^2*a/2
+                jstop = j + t*dj + t*t*a*0.5
+                if jstop < jmin:
+                    #add task to slow down
+                        #perfect accel solves for:
+                        #j - dj^2 / 2a  = jmin
+                        #dj^2 / 2(j-jmin)   = a
+                    if j <= jmin:
+                        print "Joint",self.robot.getLink(i).getName(),"exceeded min",j,"<=",jmin
+                        ades = amax
+                        w = maxw
+                    else:
+                        alim = dj*dj/(j-jmin)*0.5
+                        if alim > amax:
+                            ades = amax
+                            w = maxw
+                        else:
+                            ades = alim
+                            w = wscale*(alim-a)/(amax-alim)
+                        #print "Joint",self.robot.getLink(i).getName(),j,dj,"near lower limit",jmin,", desired accel:",ades," weight",w
+            if w > maxw:
+                w = maxw
+            self.active.append(i)
+            self.xdes.append(max(jmin,min(jmax,j)))
+            self.dxdes.append(dj+dt*ades)
+            self.weight.append(w)
+        if len(self.weight)==0:
+            self.weight = 0
+        return
+
+    def getSensedValue(self, q):
+        return [q[jointi] for jointi in self.active]
+
+    def getJacobian(self, q):
+        J = []
+        for jointi in self.active:
+            Ji = [0] * self.robot.numLinks()
+            Ji[jointi] = 1
+            J.append(Ji)
+        return J
+*/
+
 #endif // OPERATIONALSPACETASKS_H
