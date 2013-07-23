@@ -1,6 +1,8 @@
 #ifndef VALVETURNINGCONTROLLER_H
 #define VALVETURNINGCONTROLLER_H
 
+#include "drchubo_controller.h"
+
 #include "Controller.h"
 #include "Modeling/DynamicPath.h"
 #include <spline/PiecewisePolynomial.h>
@@ -36,7 +38,9 @@ public:
     ///subclasses should override this
     virtual void GetDesiredState(Config& q_des,Vector& dq_des);
 
+    op_space_control::DRCHuboOpSpace* op_space_controller_;
     Config qdesDefault;
+    bool start_;
 };
 
 /** @ingroup Control

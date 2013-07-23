@@ -3,10 +3,41 @@
 #include "Modeling/Conversions.h"
 #include <sstream>
 
-ValveTurningJointController::ValveTurningJointController(Robot& _robot)
-    :RobotController(_robot)
+std::vector<double> GetStdVector(const Math::Vector& vect)
+{
+    std::vector<double> out( vect.size() );
+    for(int i=0;i<vect.size();i++)
+    {
+        out[i] = vect[i];
+    }
+    return out;
+}
+
+Math::Vector GetKrisVector( const std::vector<double>& vect )
+{
+    Math::Vector out( vect.size() );
+    for(int i=0;i<vect.size();i++)
+    {
+        out[i] = vect[i];
+    }
+    return out;
+}
+
+ValveTurningJointController::ValveTurningJointController(Robot& _robot) : RobotController(_robot) /*, op_space_controller_()*/
 {
     qdesDefault = _robot.q;
+
+    op_space_controller_ = new op_space_control::DRCHuboOpSpace();
+
+    op_space_controller_->SetRobot( &_robot );
+    op_space_controller_->SetRobotNbDofs( _robot.q.n );
+
+    start_ = true;
+
+    // Uncomment to print joint mapping
+//    for(int i=0; i<int(robot.links.size());i++){
+//        cout << i << " : " << robot.LinkName(i) << endl;
+//    }
 }
 
 //subclasses should override this
@@ -20,27 +51,44 @@ void ValveTurningJointController::Update(Real dt)
 {
     Assert(command != NULL);
 
-    Config qdes(robot.links.size()),dqdes(robot.links.size());
-    GetDesiredState(qdes,dqdes);
+    Config qdes(robot.links.size());
+    Config dqdes(robot.links.size());
+    GetDesiredState( qdes, dqdes );
     robot.NormalizeAngles(qdes);
 
-    cout << robot.name << __func__ << " in (ValveTurningJointController)" << " from " << typeid(*this).name() << endl;
-    cout << "dt : " << dt << endl;
+    if( start_ )
+    {
+        op_space_controller_->CreateTasks( GetStdVector(qdes) );
+        start_ = false;
+    }
+
+//    cout << robot.name << __func__ << " in (ValveTurningJointController)" << " from " << typeid(*this).name() << endl;
+//    cout << "dt : " << dt << endl;
+//    cout << "qdes : " << qdes << endl;
+    cout <<"------------------------------" << endl;
+    cout << "dqdes : " << dqdes << endl;
     cout << "qdes : " << qdes << endl;
 
-    for(size_t i=0;i<robot.drivers.size();i++)
+    // Uncomment to test controller
+    std::pair< std::vector<double> , std::vector<double> > q;
+    q = op_space_controller_->Trigger( GetStdVector(qdes), GetStdVector(dqdes), dt );
+    dqdes = GetKrisVector( q.first );
+    qdes =  GetKrisVector( q.second );
+    cout << "dqdes : " << dqdes << endl;
+    cout << "qdes : " << qdes << endl;
+
+    for( size_t i=0; i<robot.drivers.size(); i++ )
     {
-        if(robot.drivers[i].type == RobotJointDriver::Normal)
+        if( robot.drivers[i].type == RobotJointDriver::Normal )
         {
-            command->actuators[i].SetPID(qdes(robot.drivers[i].linkIndices[0]),
-                                         dqdes(robot.drivers[i].linkIndices[0]),
-                                         command->actuators[i].iterm);
+            command->actuators[i].SetPID(qdes(robot.drivers[i].linkIndices[0]),  dqdes(robot.drivers[i].linkIndices[0]), command->actuators[i].iterm);
         }
-        else {
+        else
+        {
             robot.q = qdes;
             robot.dq = dqdes;
-            //printf("Desired affine driver value %g, vel %g\n",robot.GetDriverValue(i),robot.GetDriverVelocity(i));
-            command->actuators[i].SetPID(robot.GetDriverValue(i),robot.GetDriverVelocity(i),command->actuators[i].iterm);
+            cout << "Desired affine driver value " << robot.GetDriverValue(i) <<", " << robot.GetDriverVelocity(i) << endl;
+            command->actuators[i].SetPID( robot.GetDriverValue(i), robot.GetDriverVelocity(i), command->actuators[i].iterm );
         }
     }
     RobotController::Update(dt);
@@ -72,8 +120,7 @@ bool ValveTurningJointController::SendCommand(const string& name,const string& s
 //-------------------------------------------------------
 //-------------------------------------------------------
 
-ValveTurningPathController::ValveTurningPathController(Robot& robot)
-    : ValveTurningJointController(robot)
+ValveTurningPathController::ValveTurningPathController(Robot& robot) : ValveTurningJointController(robot)
 {
     pathOffset = 0;
     path.elements.resize(robot.q.n);
@@ -188,7 +235,8 @@ void ValveTurningPathController::GetDesiredState(Config& q_des,Vector& dq_des)
 
 void ValveTurningPathController::Update(Real dt)
 {
-    cout << robot.name << __func__ << " in (ValveTurningPathController)" << " from " << typeid(*this).name() << endl;
+//    cout << robot.name << __func__ << " in (ValveTurningPathController)" << " from " << typeid(*this).name() << endl;
+//    cout << "pathOffset : " << pathOffset << endl;
     pathOffset += dt;
     //keep the path relatively short
     if((pathOffset - path.StartTime()) > Max(0.1,0.1*(path.EndTime()-path.StartTime())))
