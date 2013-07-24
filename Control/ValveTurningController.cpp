@@ -3,25 +3,21 @@
 #include "Modeling/Conversions.h"
 #include <sstream>
 
-std::vector<double> GetStdVector(const Math::Vector& vect)
+const RobotLink3D& GetLinkByName(const Robot& robot, const std::string& name)
 {
-    std::vector<double> out( vect.size() );
-    for(int i=0;i<vect.size();i++)
+    for(int i=0; i<int(robot.links.size());i++)
     {
-        out[i] = vect[i];
+        if( robot.linkNames[i] == name )
+            return robot.links[i];
     }
-    return out;
+
+    cout << "Error getting link by name" << endl;
+    return robot.links[0];
 }
 
-Math::Vector GetKrisVector( const std::vector<double>& vect )
-{
-    Math::Vector out( vect.size() );
-    for(int i=0;i<vect.size();i++)
-    {
-        out[i] = vect[i];
-    }
-    return out;
-}
+//-------------------------------------------------------
+//-------------------------------------------------------
+//-------------------------------------------------------
 
 ValveTurningJointController::ValveTurningJointController(Robot& _robot) : RobotController(_robot) /*, op_space_controller_()*/
 {
@@ -30,18 +26,19 @@ ValveTurningJointController::ValveTurningJointController(Robot& _robot) : RobotC
     op_space_controller_ = new op_space_control::DRCHuboOpSpace();
 
     op_space_controller_->SetRobot( &_robot );
+    op_space_controller_->SetLinkNames( _robot.linkNames);
     op_space_controller_->SetRobotNbDofs( _robot.q.n );
 
     start_ = true;
 
     // Uncomment to print joint mapping
-//    for(int i=0; i<int(robot.links.size());i++){
-//        cout << i << " : " << robot.LinkName(i) << endl;
-//    }
+    for(int i=0; i<int(robot.links.size());i++){
+        cout << i << " : " << robot.LinkName(i) << endl;
+    }
 }
 
 //subclasses should override this
-void ValveTurningJointController::GetDesiredState(Config& q_des,Vector& dq_des)
+void ValveTurningJointController::GetDesiredState( Config& q_des,Vector& dq_des )
 {
     q_des = qdesDefault;
     dq_des.setZero();
@@ -58,24 +55,20 @@ void ValveTurningJointController::Update(Real dt)
 
     if( start_ )
     {
-        op_space_controller_->CreateTasks( GetStdVector(qdes) );
+        op_space_controller_->CreateTasks( qdes, dt );
         start_ = false;
+        cout << GetLinkByName(robot,"Body_TSY").T_World << endl;
     }
 
-//    cout << robot.name << __func__ << " in (ValveTurningJointController)" << " from " << typeid(*this).name() << endl;
-//    cout << "dt : " << dt << endl;
-//    cout << "qdes : " << qdes << endl;
-    cout <<"------------------------------" << endl;
-    cout << "dqdes : " << dqdes << endl;
-    cout << "qdes : " << qdes << endl;
+    // Get current state
+    Config q_cur = sensors->GetTypedSensor<JointPositionSensor>()->q;
+    Vector dq_cur = sensors->GetTypedSensor<JointVelocitySensor>()->dq;
 
-    // Uncomment to test controller
-    std::pair< std::vector<double> , std::vector<double> > q;
-    q = op_space_controller_->Trigger( GetStdVector(qdes), GetStdVector(dqdes), dt );
-    dqdes = GetKrisVector( q.first );
-    qdes =  GetKrisVector( q.second );
-    cout << "dqdes : " << dqdes << endl;
-    cout << "qdes : " << qdes << endl;
+    // Run OpSpace controller
+    std::pair< std::vector<double> , std::vector<double> > q_opspace_;
+    q_opspace_ = op_space_controller_->Trigger( q_cur, dq_cur, qdes, dqdes, dt );
+    dqdes = q_opspace_.first;
+    qdes =  q_opspace_.second;
 
     for( size_t i=0; i<robot.drivers.size(); i++ )
     {
