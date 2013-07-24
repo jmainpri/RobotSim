@@ -32,39 +32,119 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Wim Meeussen */
+/* Author: John Hsu */
 
-#ifndef URDF_PARSER_URDF_PARSER_H
-#define URDF_PARSER_URDF_PARSER_H
+#ifndef URDF_MODEL_STATE_H
+#define URDF_MODEL_STATE_H
 
 #include <string>
+#include <vector>
 #include <map>
-#include <tinyxml.h>
-#include <boost/function.hpp>
-//#include <urdf_model/model.h>
-#include "urdf_model.h"
-#include "urdf_world.h"
-#include "urdf_color.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 
-namespace urdf_export_helpers {
+#include "urdf_pose.h"
+#include "urdf_twist.h"
 
-std::string values2str(unsigned int count, const double *values, double (*conv)(double) = NULL);
-std::string values2str(urdf::Vector3 vec);
-std::string values2str(urdf::Rotation rot);
-std::string values2str(urdf::Color c);
-std::string values2str(double d);
-
-}
 
 namespace urdf{
 
-  boost::shared_ptr<ModelInterface> parseURDF(const std::string &xml_string);
-  TiXmlDocument*  exportURDF(boost::shared_ptr<ModelInterface> &model);
-   // Added functions by achq on 2012/10/13  ********* //
-  bool isObjectURDF( const std::string &_xml_string );
-  bool isRobotURDF( const std::string &_xml_string );
-  boost::shared_ptr<World> parseWorldURDF(const std::string &xml_string, std::string _path );
-  // ********************************************** //
+static int my_round (double x) {
+  int i = (int) x;
+  if (x >= 0.0) {
+    return ((x-i) >= 0.5) ? (i + 1) : (i);
+  } else {
+    return (-x+i >= 0.5) ? (i - 1) : (i);
+  }
+}
+
+class Time
+{
+public:
+  Time() { this->clear(); };
+
+  void set(double _seconds)
+  {
+    this->sec = (int32_t)(floor(_seconds));
+    this->nsec = (int32_t)(my_round((_seconds - this->sec) * 1e9));
+    this->Correct();
+  };
+
+  operator double ()
+  {
+    return (static_cast<double>(this->sec) +
+            static_cast<double>(this->nsec)*1e-9);
+  };
+
+  int32_t sec;
+  int32_t nsec;
+
+  void clear()
+  {
+    this->sec = 0;
+    this->nsec = 0;
+  };
+private:
+  void Correct()
+  {
+    // Make any corrections
+    if (this->nsec >= 1e9)
+    {
+      this->sec++;
+      this->nsec = (int32_t)(this->nsec - 1e9);
+    }
+    else if (this->nsec < 0)
+    {
+      this->sec--;
+      this->nsec = (int32_t)(this->nsec + 1e9);
+    }
+  };
+};
+
+
+class JointState
+{
+public:
+  JointState() { this->clear(); };
+
+  /// joint name
+  std::string joint;
+
+  std::vector<double> position;
+  std::vector<double> velocity;
+  std::vector<double> effort;
+
+  void clear()
+  {
+    this->joint.clear();
+    this->position.clear();
+    this->velocity.clear();
+    this->effort.clear();
+  }
+};
+
+class ModelState
+{
+public:
+  ModelState() { this->clear(); };
+
+  /// state name must be unique
+  std::string name;
+
+  Time time_stamp;
+
+  void clear()
+  {
+    this->name.clear();
+    this->time_stamp.set(0);
+    this->joint_states.clear();
+  };
+
+  std::vector<boost::shared_ptr<JointState> > joint_states;
+
+};
+
 }
 
 #endif
+

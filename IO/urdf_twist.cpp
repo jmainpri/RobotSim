@@ -32,39 +32,53 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Wim Meeussen */
+/* Author: John Hsu */
 
-#ifndef URDF_PARSER_URDF_PARSER_H
-#define URDF_PARSER_URDF_PARSER_H
 
-#include <string>
-#include <map>
+#include "urdf_twist.h"
+#include <fstream>
+#include <sstream>
+#include <boost/lexical_cast.hpp>
+#include <algorithm>
 #include <tinyxml.h>
-#include <boost/function.hpp>
-//#include <urdf_model/model.h>
-#include "urdf_model.h"
-#include "urdf_world.h"
-#include "urdf_color.h"
-
-namespace urdf_export_helpers {
-
-std::string values2str(unsigned int count, const double *values, double (*conv)(double) = NULL);
-std::string values2str(urdf::Vector3 vec);
-std::string values2str(urdf::Rotation rot);
-std::string values2str(urdf::Color c);
-std::string values2str(double d);
-
-}
 
 namespace urdf{
 
-  boost::shared_ptr<ModelInterface> parseURDF(const std::string &xml_string);
-  TiXmlDocument*  exportURDF(boost::shared_ptr<ModelInterface> &model);
-   // Added functions by achq on 2012/10/13  ********* //
-  bool isObjectURDF( const std::string &_xml_string );
-  bool isRobotURDF( const std::string &_xml_string );
-  boost::shared_ptr<World> parseWorldURDF(const std::string &xml_string, std::string _path );
-  // ********************************************** //
+bool parseTwist(Twist &twist, TiXmlElement* xml)
+{
+  twist.clear();
+  if (xml)
+  {
+    const char* linear_char = xml->Attribute("linear");
+    if (linear_char != NULL)
+    {
+      try {
+        twist.linear.init(linear_char);
+      }
+      catch (ParseError &e) {
+        twist.linear.clear();
+        printf("Malformed linear string [%s]: %s \n", linear_char, e.what());
+        return false;
+      }
+    }
+
+    const char* angular_char = xml->Attribute("angular");
+    if (angular_char != NULL)
+    {
+      try {
+        twist.angular.init(angular_char);
+      }
+      catch (ParseError &e) {
+        twist.angular.clear();
+        printf("Malformed angular [%s]: %s \n", angular_char, e.what());
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
-#endif
+}
+
+
+

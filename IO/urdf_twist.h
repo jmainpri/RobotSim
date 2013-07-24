@@ -32,39 +32,37 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Wim Meeussen */
+/* Author: John Hsu */
 
-#ifndef URDF_PARSER_URDF_PARSER_H
-#define URDF_PARSER_URDF_PARSER_H
+#ifndef URDF_TWIST_H
+#define URDF_TWIST_H
 
 #include <string>
-#include <map>
-#include <tinyxml.h>
-#include <boost/function.hpp>
-//#include <urdf_model/model.h>
-#include "urdf_model.h"
-#include "urdf_world.h"
-#include "urdf_color.h"
-
-namespace urdf_export_helpers {
-
-std::string values2str(unsigned int count, const double *values, double (*conv)(double) = NULL);
-std::string values2str(urdf::Vector3 vec);
-std::string values2str(urdf::Rotation rot);
-std::string values2str(urdf::Color c);
-std::string values2str(double d);
-
-}
+#include <sstream>
+#include <vector>
+#include <math.h>
+#include "urdf_pose.h"
 
 namespace urdf{
 
-  boost::shared_ptr<ModelInterface> parseURDF(const std::string &xml_string);
-  TiXmlDocument*  exportURDF(boost::shared_ptr<ModelInterface> &model);
-   // Added functions by achq on 2012/10/13  ********* //
-  bool isObjectURDF( const std::string &_xml_string );
-  bool isRobotURDF( const std::string &_xml_string );
-  boost::shared_ptr<World> parseWorldURDF(const std::string &xml_string, std::string _path );
-  // ********************************************** //
+
+class Twist
+{
+public:
+  Twist() { this->clear(); };
+
+  Vector3  linear;
+  // Angular velocity represented by Euler angles
+  Vector3  angular;
+
+  void clear()
+  {
+    this->linear.clear();
+    this->angular.clear();
+  };
+};
+
 }
 
 #endif
+

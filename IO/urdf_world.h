@@ -32,39 +32,84 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Wim Meeussen */
+/* Author: John Hsu */
 
-#ifndef URDF_PARSER_URDF_PARSER_H
-#define URDF_PARSER_URDF_PARSER_H
+/* encapsulates components in a world
+   see http://ros.org/wiki/usdf/XML/urdf_world and
+   for details
+*/
+/* example world XML
+
+<world name="pr2_with_table">
+  <!-- include the models by including
+       either the complete urdf or
+       referencing the file name.  -->
+  <model name="pr2">
+    ...
+  </model>
+  <include filename="table.urdf" model_name="table_model"/>
+
+  <!-- models in the world -->
+  <entity model="pr2" name="prj">
+    <origin xyz="0 1 0" rpy="0 0 0"/>
+    <twist linear="0 0 0" angular="0 0 0"/>
+  </entity>
+  <entity model="pr2" name="prk">
+    <origin xyz="0 2 0" rpy="0 0 0"/>
+    <twist linear="0 0 0" angular="0 0 0"/>
+  </entity>
+  <entity model="table_model">
+    <origin xyz="0 3 0" rpy="0 0 0"/>
+    <twist linear="0 0 0" angular="0 0 0"/>
+  </entity>
+
+</world>
+
+*/
+
+#ifndef USDF_STATE_H
+#define USDF_STATE_H
 
 #include <string>
+#include <vector>
 #include <map>
 #include <tinyxml.h>
-#include <boost/function.hpp>
-//#include <urdf_model/model.h>
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
+
 #include "urdf_model.h"
-#include "urdf_world.h"
-#include "urdf_color.h"
-
-namespace urdf_export_helpers {
-
-std::string values2str(unsigned int count, const double *values, double (*conv)(double) = NULL);
-std::string values2str(urdf::Vector3 vec);
-std::string values2str(urdf::Rotation rot);
-std::string values2str(urdf::Color c);
-std::string values2str(double d);
-
-}
+#include "urdf_pose.h"
+#include "urdf_twist.h"
 
 namespace urdf{
 
-  boost::shared_ptr<ModelInterface> parseURDF(const std::string &xml_string);
-  TiXmlDocument*  exportURDF(boost::shared_ptr<ModelInterface> &model);
-   // Added functions by achq on 2012/10/13  ********* //
-  bool isObjectURDF( const std::string &_xml_string );
-  bool isRobotURDF( const std::string &_xml_string );
-  boost::shared_ptr<World> parseWorldURDF(const std::string &xml_string, std::string _path );
-  // ********************************************** //
+class Entity
+{
+public:
+  boost::shared_ptr<ModelInterface> model;
+  Pose origin;
+  Twist twist;
+};
+
+class World
+{
+public:
+  World() { this->clear(); };
+
+  /// world name must be unique
+  std::string name;
+
+  std::vector<Entity> objectModels;
+  std::vector<Entity> robotModels;
+
+  void initXml(TiXmlElement* config);
+
+  void clear()
+  {
+    this->name.clear();
+  };
+};
 }
 
 #endif
+
