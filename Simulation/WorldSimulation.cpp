@@ -278,6 +278,22 @@ void WorldSimulation::Advance(Real dt)
       controlSimulators[i].Step(step);
     for(size_t i=0;i<hooks.size();i++)
       hooks[i]->Step(step);
+
+    //update viscous friction approximation as dry friction from current velocity
+    for(size_t i=0;i<controlSimulators.size();i++) {
+      Robot* robot=world->robots[i].robot;
+      for(size_t j=0;j<robot->drivers.size();j++) {
+	//setup viscous friction
+	if(robot->drivers[j].viscousFriction != 0) {
+	  Real v=controlSimulators[i].oderobot->GetDriverVelocity(j);
+	  for(size_t k=0;k<robot->drivers[j].linkIndices.size();k++) {
+	    int l=robot->drivers[j].linkIndices[k];
+	    controlSimulators[i].oderobot->SetLinkDryFriction(l,robot->drivers[j].dryFriction+robot->drivers[j].viscousFriction*Abs(v));
+	  }
+	}
+      }
+    }
+
     odesim.Step(step);
     accumTime += step;
     timeLeft -= step;

@@ -143,6 +143,7 @@ class RobotModel
   void setTorqueLimits(const std::vector<double>& tmax);
 
   //dynamics functions
+  void getCom(double out[3]);
   void getMassMatrix(std::vector<std::vector<double> >& out);
   void getMassMatrixInv(std::vector<std::vector<double> >& out);
   void getCoriolisForceMatrix(std::vector<std::vector<double> >& out);

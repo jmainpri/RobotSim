@@ -61,7 +61,8 @@ struct RobotJointDriver
   vector<Real> affScaling;  //for Affine joints
   vector<Real> affOffset;   //for Affine joints
   Real servoP,servoI,servoD;  //servo parameters
-  Real dryFriction;           //friction coefficient
+  Real dryFriction;           //constant friction coefficient
+  Real viscousFriction;       //velocity-dependent friction coefficient
 };
 
 /** @ingroup Modeling
@@ -74,10 +75,10 @@ struct RobotJointDriver
 class Robot : public RobotWithGeometry
 {
 public:
-  virtual std::string LinkName(int i);
+  virtual std::string LinkName(int i) const;
   bool Load(const char* fn);
   bool LoadRob(const char* fn);
-  bool LoadURDF( const char* fn);
+  bool LoadURDF(const char* fn);
   bool Save(const char* fn,const char* geomPrefix="",const char* geomExt="tri");  ///< Saves the geometry line as geomPrefix+[linkName].[geomExt]
   bool Save(const char* fn,const vector<string>& geomFiles); 
   bool SaveGeometry(const char* geomPrefix="",const char* geomExt="tri");  ///< Saves the geometry files to geomPrefix+[linkName].[geomExt]
