@@ -3,16 +3,21 @@
 #include "Modeling/Conversions.h"
 #include <sstream>
 
-const RobotLink3D& GetLinkByName(const Robot& robot, const std::string& name)
+int GetLinkIdByName(const Robot& robot, const std::string& name)
 {
     for(int i=0; i<int(robot.links.size());i++)
     {
         if( robot.linkNames[i] == name )
-            return robot.links[i];
+            return i;
     }
 
     cout << "Error getting link by name" << endl;
-    return robot.links[0];
+    return 0;
+}
+
+const RobotLink3D& GetLinkByName(const Robot& robot, const std::string& name)
+{
+    return robot.links[GetLinkIdByName(robot,name)];
 }
 
 //-------------------------------------------------------
@@ -24,9 +29,8 @@ ValveTurningJointController::ValveTurningJointController(Robot& _robot) : RobotC
     qdesDefault = _robot.q;
 
     op_space_controller_ = new op_space_control::DRCHuboOpSpace();
-
     op_space_controller_->SetRobot( &_robot );
-    op_space_controller_->SetLinkNames( _robot.linkNames);
+    op_space_controller_->SetLinkNames( _robot.linkNames );
     op_space_controller_->SetRobotNbDofs( _robot.q.n );
 
     start_ = true;
@@ -53,6 +57,12 @@ void ValveTurningJointController::Update(Real dt)
     GetDesiredState( qdes, dqdes );
     robot.NormalizeAngles(qdes);
 
+//    qdes = Config(robot.links.size(),0.0);
+//    dqdes = Config(robot.links.size(),0.0);
+
+//    qdes[GetLinkIdByName(robot,"Body_LEP")] = -0.3;
+//    qdes[GetLinkIdByName(robot,"Body_REP")] = -0.3;
+
     if( start_ )
     {
         op_space_controller_->CreateTasks( qdes, dt );
@@ -61,14 +71,52 @@ void ValveTurningJointController::Update(Real dt)
     }
 
     // Get current state
-    Config q_cur = sensors->GetTypedSensor<JointPositionSensor>()->q;
-    Vector dq_cur = sensors->GetTypedSensor<JointVelocitySensor>()->dq;
+    bool not_use_opspace = false;
+    if( not_use_opspace || !sensors->GetTypedSensor<JointPositionSensor>() ) {
+        if( !not_use_opspace )
+            cout << "No joint positions, OpSpace disabled" << endl;
+    }
+    else
+    {
+        robot.UpdateConfig( sensors->GetTypedSensor<JointPositionSensor>()->q );
 
-    // Run OpSpace controller
-    std::pair< std::vector<double> , std::vector<double> > q_opspace_;
-    q_opspace_ = op_space_controller_->Trigger( q_cur, dq_cur, qdes, dqdes, dt );
-    dqdes = q_opspace_.first;
-    qdes =  q_opspace_.second;
+        if(!sensors->GetTypedSensor<JointVelocitySensor>())
+        {
+            cout << "No velocity" << endl;
+            robot.dq.setZero();
+        }
+        else {
+            robot.dq = sensors->GetTypedSensor<JointVelocitySensor>()->dq;
+        }
+
+        // Get configuration and velocity
+        Config q_cur = robot.q;
+        Vector dq_cur = robot.dq;
+
+// Error builds up because of sensor error
+//        qdes = q_cur;
+//        qdes.madd( dqdes, dt );
+
+        cout << "1 RAP : " << qdes[GetLinkIdByName(robot,"Body_RAP")] << endl;
+        cout << "1 LAP : " << qdes[GetLinkIdByName(robot,"Body_LAP")] << endl;
+
+        // Run OpSpace controller
+        std::pair< std::vector<double> , std::vector<double> > q_opspace_;
+        q_opspace_ = op_space_controller_->Trigger( q_cur, dq_cur, qdes, dqdes, dt );
+        qdes    = q_opspace_.first; // modifed configuration
+        dqdes   = q_opspace_.second; // modified velocity
+
+        qdes[GetLinkIdByName(robot,"Body_RAP")] = 0.0;
+        qdes[GetLinkIdByName(robot,"Body_LAP")] = 0.0;
+
+        dqdes[GetLinkIdByName(robot,"Body_RAP")] = 0.0;
+        dqdes[GetLinkIdByName(robot,"Body_LAP")] = 0.0;
+
+        cout << "2 RAP : " << qdes[GetLinkIdByName(robot,"Body_RAP")] << endl;
+        cout << "2 LAP : " << qdes[GetLinkIdByName(robot,"Body_LAP")] << endl;
+    }
+
+    //cout << "qdes : " << qdes << endl;
 
     for( size_t i=0; i<robot.drivers.size(); i++ )
     {
