@@ -7,6 +7,7 @@
 #include <Modeling/Robot.h>
 #include <string.h>
 #include <utils/stringutils.h>
+#include "IO/URDFConverter.h"
 int main(int argc, char** argv) {
 	if (argc < 2 || argc > 3) {
 		printf(
@@ -24,6 +25,11 @@ int main(int argc, char** argv) {
 	filename.append(".rob");
 	const char* ext = FileExtension(argv[1]);
 	string path = GetFilePath(argv[1]);
+
+	//temporary -- TODO: make this a flag
+	printf("TEMP: using visualization geometry\n");
+	URDFConverter::useVisGeom = true;
+
 	if (0 == strcmp(ext, "urdf")) {
 		Robot robot;
 
