@@ -944,6 +944,13 @@ void RobotModel::drawGL(bool keepAppearance)
   }
 }
 
+
+void RobotModel::getCom(double out[3])
+{
+  Vector3 com = robot->GetCOM();
+  com.get(out);
+}
+
 void RobotModel::getMassMatrix(std::vector<std::vector<double> >& B)
 {
   Matrix Bmat;

@@ -51,7 +51,7 @@ bool RobotJointDriver::Affects(int link) const {
 	return false;
 }
 
-std::string Robot::LinkName(int i) {
+std::string Robot::LinkName(int i) const {
 	if (linkNames.empty())
 		return RobotWithGeometry::LinkName(i);
 	else if (linkNames[i].empty())
@@ -86,7 +86,7 @@ bool Robot::LoadRob(const char* fn) {
 	vector<Matrix3> inertiaVec;
 	vector<Real> qMinVec, qMaxVec, qVec;
 	vector<Real> vMinVec, vMaxVec, aMaxVec, tMaxVec, pMaxVec;
-	vector<Real> servoP, servoI, servoD, dryFriction;
+	vector<Real> servoP, servoI, servoD, dryFriction, viscousFriction;
 	vector<Real> alpha, a, d, theta;
 	vector<RigidTransform> TParent;
 	vector<Vector3> axes;
@@ -227,6 +227,9 @@ bool Robot::LoadRob(const char* fn) {
 		} else if (name == "dryfriction") {
 			while (ss >> ftemp)
 				dryFriction.push_back(ftemp);
+		} else if (name == "viscousfriction") {
+			while (ss >> ftemp)
+				viscousFriction.push_back(ftemp);
 		} else if (name == "tparent") {
 			RigidTransform Ttemp;
 			while (ss >> Ttemp)
@@ -399,6 +402,7 @@ bool Robot::LoadRob(const char* fn) {
 				tempDriver.servoI = 0;
 				tempDriver.servoD = 0;
 				tempDriver.dryFriction = 0;
+				tempDriver.viscousFriction = 0;
 				if (stemp == "normal") {
 					tempDriver.type = RobotJointDriver::Normal;
 					tempDriver.linkIndices.resize(1);
@@ -762,9 +766,11 @@ bool Robot::LoadRob(const char* fn) {
 				if (!geometry[i].tris.empty() && links[i].mass != 0.0) {
 					links[i].inertia = Inertia(geometry[i], links[i].com,
 							links[i].mass);
-					//cout<<"Inertia: "<<links[i].inertia<<endl;
-				} else
+					//cout<<"Automass inertia for "<<linkNames[i]<<": "<<endl<<links[i].inertia<<endl;
+				} else {
 					links[i].inertia.setZero();
+					//cout<<"Automass setting zero inertia for "<<linkNames[i]<<endl;
+				}
 			}
 		}
 	}
@@ -844,6 +850,7 @@ bool Robot::LoadRob(const char* fn) {
 			d.servoI = 0;
 			d.servoD = 0;
 			d.dryFriction = 0;
+			d.viscousFriction = 0;
 			drivers.push_back(d);
 		}
 		nd = (int) drivers.size();
@@ -890,6 +897,10 @@ bool Robot::LoadRob(const char* fn) {
 		fprintf(stderr, "Wrong number of dry friction parameters specified\n");
 		return false;
 	}
+	if (!viscousFriction.empty() && (int) viscousFriction.size() != nd) {
+		fprintf(stderr, "Wrong number of viscous friction parameters specified\n");
+		return false;
+	}
 	for (size_t i = 0; i < servoP.size(); i++) {
 		drivers[i].servoP = servoP[i];
 		Assert(servoP[i] >= 0);
@@ -905,6 +916,10 @@ bool Robot::LoadRob(const char* fn) {
 	for (size_t i = 0; i < dryFriction.size(); i++) {
 		drivers[i].dryFriction = dryFriction[i];
 		Assert(dryFriction[i] >= 0);
+	}
+	for (size_t i = 0; i < viscousFriction.size(); i++) {
+		drivers[i].viscousFriction = viscousFriction[i];
+		Assert(viscousFriction[i] >= 0);
 	}
 
 	if (!CheckValid())
@@ -1232,6 +1247,12 @@ bool Robot::Save(const char* fn, const vector<string>& geomFiles) {
 		file << drivers[i].dryFriction << " ";
 	}
 	file << endl;
+
+	file << "viscousFriction\t";
+	for (int i = 0; i < nDrivers; i++) {
+		file << drivers[i].viscousFriction << " ";
+	}
+	file << endl;
 	file.close();
 	return true;
 }
@@ -1243,12 +1264,14 @@ bool Robot::CheckValid() const {
 			printf("Invalid parent[%d]=%d\n", i, parents[i]);
 			return false;
 		}
+	/*
 	for (size_t i = 0; i < links.size(); i++) {
 		if (!FuzzyEquals(links[i].w.norm(), 1.0)) {
 			printf("Invalid axis %d\n", i);
 			return false;
 		}
 	}
+	*/
 	vector<bool> matchedLink(links.size(), false);
 	vector<bool> drivenLink(links.size(), false);
 
@@ -1960,7 +1983,8 @@ void Robot::GetDriverJacobian(int d, Vector& J) {
 	}
 }
 
-bool Robot::LoadURDF(const char* fn){
+bool Robot::LoadURDF(const char* fn)
+{
 	string s(fn);
 	string path = GetFilePath(s);
 	//Get content from the Willow Garage parser
@@ -1977,8 +2001,8 @@ bool Robot::LoadURDF(const char* fn){
 		return false;
 	}
 
-	cout << "Link size:" << links_size << endl;
-	cout << "Joint size:" << joints_size << endl;
+	cout << "Link size: " << links_size << endl;
+	cout << "Joint size: " << joints_size << endl;
 
 	//Feed the information from parser to required vectors in ROB format
 	//The following vectors have the same dimension of the links vector
@@ -2149,13 +2173,21 @@ bool Robot::LoadURDF(const char* fn){
 				driver.servoI = 0;
 				driver.servoD = 10;
 				driver.dryFriction = 0;
-				if (joint->dynamics)
-					driver.dryFriction =
-							joint->dynamics->friction;
-
+				driver.viscousFriction = 0;
+				if (joint->dynamics) {
+				  driver.dryFriction = joint->dynamics->friction;
+				  driver.viscousFriction = joint->dynamics->damping;
+				}
 				drivers.push_back(driver);
 			}
 		}
+	}
+	
+	UpdateFrames();
+	for (int i = 0; i < linkNodes.size(); i++) {
+		URDFLinkNode* linkNode = &linkNodes[i];
+		int link_index = linkNode->index + 5;
+
 		//geometry
 		if (!linkNode->geomName.empty()) {
 		  string fn;

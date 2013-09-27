@@ -183,6 +183,21 @@ bool XmlSimulationSettings::GetSettings(WorldSimulation& sim)
 	fprintf(stderr,"Unable to load controller from xml file\n");
 	return false;
       }
+      Real temp;
+      if(ec->QueryValueAttribute("rate",&temp)==TIXML_SUCCESS){
+	if(!(temp > 0)) {
+	  fprintf(stderr,"Invalid rate %g\n",temp);
+	  continue;
+	}
+	sim.controlSimulators[index].controlTimeStep = 1.0/temp;
+      }
+      if(ec->QueryValueAttribute("timeStep",&temp)==TIXML_SUCCESS){
+	if(!(temp > 0)) {
+	  fprintf(stderr,"Invalid timestep %g\n",temp);
+	  continue;
+	}
+	sim.controlSimulators[index].controlTimeStep = temp;
+      }
     }
     TiXmlElement*es=c->FirstChildElement("sensors");
     if(es) {

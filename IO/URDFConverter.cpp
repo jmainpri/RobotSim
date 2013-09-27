@@ -13,6 +13,7 @@ using namespace std;
 using namespace PrimitiveShape;
 
 string URDFConverter::primitive_mesh_path("data/objects/urdf_primitives/");
+bool URDFConverter::useVisGeom = false;
 
 int URDFConverter::GetLinkIndexfromName(string name, const vector<string> linknames){
 	int link_index = -1;
@@ -80,13 +81,13 @@ void URDFConverter::QuatToRotationMat(const Vector4& aa, Matrix3& mat){
 	w = aa.w;
 
 	mat(0,0) = 1 - 2*y*y - 2*z*z;
-	mat(0,1) = 2*x*y + 2*z*w;
-	mat(0,2) = 2*x*z - 2*w*y;
-	mat(1,0) = 2*y*x - 2*z*w;
+	mat(1,0) = 2*x*y + 2*z*w;
+	mat(2,0) = 2*x*z - 2*w*y;
+	mat(0,1) = 2*y*x - 2*z*w;
 	mat(1,1) = 1 - 2*x*x - 2*z*z;
-	mat(1,2) = 2*z*y + 2*x*w;
-	mat(2,0) = 2*x*z + 2*w*y;
-	mat(2,1) = 2*z*y - 2*x*w;
+	mat(2,1) = 2*z*y + 2*x*w;
+	mat(0,2) = 2*x*z + 2*w*y;
+	mat(1,2) = 2*z*y - 2*x*w;
 	mat(2,2) = 1 - 2*x*x - 2*y*y;
 }
 
@@ -103,42 +104,45 @@ URDFLinkNode::URDFLinkNode(boost::shared_ptr<urdf::Link>& link, int index, int i
 	this->axis.set(0,0,1);
 
 	this->GetTransformations();
-	this->GetGeometryProperty();
 	return;
 }
 
-void URDFLinkNode::GetGeometryProperty(){
+void URDFLinkNode::GetGeometryProperty(bool useVisGeom){
 	if(!this->link){
 		cout<<"link is NULL!"<<endl;
 		return;
 	}
 	geomScale.setIdentity();
 	geomPrimitive = false;
-	if(this->link->collision && this->link->collision->geometry){
-		if(this->link->collision->geometry->type == this->link->collision->geometry->BOX){
+	boost::shared_ptr<urdf::Geometry> geom;
+	if(useVisGeom && this->link->visual) geom = this->link->visual->geometry;
+	else if(!useVisGeom && this->link->collision) geom = this->link->collision->geometry;
+	if(geom){
+	  if(geom->type == urdf::Geometry::BOX){
 		  geomPrimitive = true;
 			geomName = URDFConverter::primitive_mesh_path + "box_ori_center.tri";
-			boost::shared_ptr<urdf::Box> box = boost::static_pointer_cast<urdf::Box>(this->link->collision->geometry);
+			boost::shared_ptr<urdf::Box> box = boost::static_pointer_cast<urdf::Box>(geom);
 			geomScale(0,0) = box->dim.x;
 			geomScale(1,1) = box->dim.y;
 			geomScale(2,2) = box->dim.z;
 
-		}else if(this->link->collision->geometry->type == this->link->collision->geometry->CYLINDER){
+		}else if(geom->type == urdf::Geometry::CYLINDER){
 		  geomPrimitive = true;
 			geomName = URDFConverter::primitive_mesh_path + "cylinder_ori_center.tri";
-			boost::shared_ptr<urdf::Cylinder> cylinder = boost::static_pointer_cast<urdf::Cylinder>(this->link->collision->geometry);
+			boost::shared_ptr<urdf::Cylinder> cylinder = boost::static_pointer_cast<urdf::Cylinder>(geom);
 			geomScale(0,0) = cylinder->radius;
 			geomScale(1,1) = cylinder->radius;
 			geomScale(2,2) = cylinder->length;
-		}if(this->link->collision->geometry->type == this->link->collision->geometry->SPHERE){
+		}else if(geom->type == urdf::Geometry::SPHERE){
 		  geomPrimitive = true;
 			geomName = URDFConverter::primitive_mesh_path + "sphere_ori_center.tri";
-			boost::shared_ptr<urdf::Sphere> sphere = boost::static_pointer_cast<urdf::Sphere>(this->link->collision->geometry);
+			boost::shared_ptr<urdf::Sphere> sphere = boost::static_pointer_cast<urdf::Sphere>(geom);
 			geomScale(0,0) = sphere->radius;
 			geomScale(1,1) = sphere->radius;
 			geomScale(2,2) = sphere->radius;
-		}if(this->link->collision->geometry->type == this->link->collision->geometry->MESH){
-			boost::shared_ptr<urdf::Mesh> mesh = boost::static_pointer_cast<urdf::Mesh>(this->link->collision->geometry);
+		}
+	  else if(geom->type == urdf::Geometry::MESH){
+			boost::shared_ptr<urdf::Mesh> mesh = boost::static_pointer_cast<urdf::Mesh>(geom);
 			geomName = mesh->filename.c_str();
 			geomScale(0,0) = mesh->scale.x;
 			geomScale(1,1) = mesh->scale.y;
@@ -221,6 +225,7 @@ void URDFConverter::ConvertWrltoTri(string filename){
 
 void URDFConverter::processTParentTransformations(vector<URDFLinkNode>& linkNodes){
 	for(int i = 0; i < linkNodes.size(); i++){
+	  linkNodes[i].GetGeometryProperty(useVisGeom);
 		RigidTransform T0, T1, T2;
 		T0.setIdentity();
 		Vector3 tmpaxis;
@@ -239,8 +244,14 @@ void URDFConverter::processTParentTransformations(vector<URDFLinkNode>& linkNode
 		linkNodes[i].T_parent.set(T0);
 
 		RigidTransform G0, G1;
-		G0.mul(linkNodes[i].T_link_to_inertia_inverse, linkNodes[i].T_link_to_colgeom);
-		G1.mul(linkNodes[i].T_link_to_colgeom, linkNodes[i].geomScale);
+		if(useVisGeom) {
+		  G0.mul(linkNodes[i].T_link_to_inertia_inverse, linkNodes[i].T_link_to_visgeom);
+		  G1.mul(linkNodes[i].T_link_to_visgeom, linkNodes[i].geomScale);
+		}
+		else {
+		  G0.mul(linkNodes[i].T_link_to_inertia_inverse, linkNodes[i].T_link_to_colgeom);
+		  G1.mul(linkNodes[i].T_link_to_colgeom, linkNodes[i].geomScale);
+		}
 		linkNodes[i].geomScale.set(G1);
 	}
 }
