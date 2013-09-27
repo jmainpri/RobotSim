@@ -40,6 +40,8 @@ bool LoggingController::LoadLog(const char* fn)
 
 void LoggingController::Update(Real dt)
 {
+//  cout << "----------------------" << endl;
+//  cout << robot.name << " in " << __func__ << " of " << typeid(*this).name() << endl;
   base->command = command;
   base->sensors = sensors;
   if(replay) {   //replay mode
@@ -75,6 +77,7 @@ void LoggingController::Update(Real dt)
   }
   else {  //normal mode
     RobotController::Update(dt);
+//    cout << "base->Update(dt)" << endl;
     base->Update(dt);
 
     if(save) {

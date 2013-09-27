@@ -1,12 +1,16 @@
 #ifndef VALVETURNINGCONTROLLER_H
 #define VALVETURNINGCONTROLLER_H
 
+#ifdef OPCONTROL
 #include "drchubo_controller.h"
+#endif
 
 #include "Controller.h"
 #include "Modeling/DynamicPath.h"
 #include <spline/PiecewisePolynomial.h>
 #include <list>
+
+class RobotWorld;
 
 
 /** @brief A controller base class that reads out a desired servo position
@@ -30,6 +34,9 @@ public:
         if(!qdesDefault.Write(f)) return false;
         return true;
     }
+    void SetWorld( RobotWorld * w ) { world_ = w; }
+
+    void Draw();
 
     //commands
     virtual vector<string> Commands() const;
@@ -38,8 +45,12 @@ public:
     ///subclasses should override this
     virtual void GetDesiredState(Config& q_des,Vector& dq_des);
 
-    op_space_control::DRCHuboOpSpace* op_space_controller_;
+#ifdef OPCONTROL
+    OpSpaceControl::DRCHuboOpSpace* op_space_controller_;
+#endif
     Config qdesDefault;
+    Config q_des_;
+    RobotWorld* world_;
     bool start_;
 };
 

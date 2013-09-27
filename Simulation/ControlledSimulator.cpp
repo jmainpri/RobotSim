@@ -4,7 +4,7 @@
 ControlledRobotSimulator::ControlledRobotSimulator()
   :robot(NULL),oderobot(NULL),controller(NULL)
 {
-  controlTimeStep = 0.01;
+  controlTimeStep = 0.005; // HERE SET TIME STEP
 }
 
 void ControlledRobotSimulator::Init(Robot* _robot,ODERobot* _oderobot,RobotController* _controller)

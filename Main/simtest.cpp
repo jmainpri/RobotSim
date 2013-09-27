@@ -1,6 +1,8 @@
 #include "Control/PathController.h"
 #include "Control/FeedforwardController.h"
 #include "Control/LoggingController.h"
+// Vavle Specific
+#include "Control/ValveTurningController.h"
 #include "Simulation/WorldSimulation.h"
 #include "Modeling/MultiPath.h"
 #include "Planning/RobotTimeScaling.h"
@@ -16,6 +18,7 @@
 //#include <GL/glut.h>
 #include <glui.h>
 #include <fstream>
+
 using namespace Math3D;
 using namespace GLDraw;
 
@@ -61,13 +64,35 @@ enum {
   IO_RAW_COMMANDS_ID,
 };
 
+ValveTurningPathController* valve_control=NULL;
+
+inline RobotController* MakeValveController(Robot* robot, RobotWorld* w)
+{
+    cout << "Make valve turning controller" << endl;
+    valve_control = new ValveTurningPathController(*robot);
+    valve_control->SetWorld( w );
+
+    FeedforwardController* fc = new FeedforwardController(*robot,valve_control);
+    LoggingController* lc= new LoggingController(*robot,fc);
+
+    //defaults -- gravity compensation is better off with free-floating robots
+    if(robot->joints[0].type == RobotJoint::Floating)
+        fc->enableGravityCompensation=false;  //feedforward capability
+    else
+        fc->enableGravityCompensation=true;  //feedforward capability
+
+    fc->enableFeedforwardAcceleration=false;  //feedforward capability
+    lc->save = false;
+    return lc;
+}
+
 typedef LoggingController MyController;
 typedef PolynomialPathController MyMilestoneController;
 inline RobotController* MakeDefaultController(Robot* robot)
 {
   PolynomialPathController* c = new PolynomialPathController(*robot);
   FeedforwardController* fc = new FeedforwardController(*robot,c);
-  LoggingController* lc=new LoggingController(*robot,fc);
+  LoggingController* lc= new LoggingController(*robot,fc);
   //defaults -- gravity compensation is better off with free-floating robots
   if(robot->joints[0].type == RobotJoint::Floating)
     fc->enableGravityCompensation=false;  //feedforward capability
@@ -460,7 +485,7 @@ public:
       robot->UpdateConfig(poseConfig);
       for(size_t j=0;j<robot->links.size();j++) {
 	glPushMatrix();
-	glMultMatrix(Matrix4(robot->links[j].T_World));
+    glMultMatrix(Matrix4(robot->links[j].T_World));
 	float color[4] = {1,1,0,0.5};
 	glMaterialfv(GL_FRONT,GL_AMBIENT_AND_DIFFUSE,color); 
 	world->robots[0].view.DrawLink_Local(j);
@@ -677,6 +702,11 @@ public:
 	glColor3f(1,0.5,0);
 	drawOrientedWireBox(bbox.dims.x,bbox.dims.y,bbox.dims.z,basis);
       }
+    }
+
+    if( valve_control != NULL )
+    {
+        valve_control->Draw();
     }
   }
 
@@ -1534,13 +1564,35 @@ int main(int argc, char** argv)
 
   SimTestProgram program(&world);
   program.sim.Init(program.world);
+
   //setup controllers and sensing parameters
   //NOTE: if you want to register additional controller factories, do it here!
   program.sim.robotControllers.resize(world.robots.size());
-  for(size_t i=0;i<program.sim.robotControllers.size();i++) {    
-    Robot* robot=world.robots[i].robot;
-    program.sim.SetController(i,MakeDefaultController(robot)); 
-    MakeDefaultSensors(robot,program.sim.controlSimulators[i].sensors);
+
+  cout << "Setting up controllers!!!" << endl;
+
+  for(size_t i=0;i<program.sim.robotControllers.size();i++)
+  {
+      Robot* robot=world.robots[i].robot;
+
+      cout << "set controller for " << robot->name << endl;
+
+      if( robot->name == "data/drchubo/DRC/drchubo-v2/drchubo_v3_no_friction.rob" )
+      {
+          cout << "Set the controller for DRCHubo" << endl;
+          program.sim.SetController(i,MakeValveController( robot, program.world ));
+          MakeDefaultSensors(robot,program.sim.controlSimulators[i].sensors);
+
+          cout << "print parents" << endl;
+          for(int i=0;i<robot->parents.size();i++){
+              cout << "parents " << i << " : " << robot->parents[i] << endl;
+          }
+      }
+      else
+      {
+          program.sim.SetController(i,MakeDefaultController(robot));
+          MakeDefaultSensors(robot,program.sim.controlSimulators[i].sensors);
+      }
   }
 
   //setup settings, if any

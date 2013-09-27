@@ -558,12 +558,13 @@ void PolynomialPathController::GetDesiredState(Config& q_des,Vector& dq_des)
 
 void PolynomialPathController::Update(Real dt)
 {
-  pathOffset += dt;
-  //keep the path relatively short
-  if((pathOffset - path.StartTime()) > Max(0.1,0.1*(path.EndTime()-path.StartTime())))
-    path.TrimFront(pathOffset);
+//    cout << robot.name << __func__ << " in (PolynomialPathController)" << " from " << typeid(*this).name() << endl;
+    pathOffset += dt;
+    //keep the path relatively short
+    if((pathOffset - path.StartTime()) > Max(0.1,0.1*(path.EndTime()-path.StartTime())))
+        path.TrimFront(pathOffset);
 
-  JointTrackingController::Update(dt);
+    JointTrackingController::Update(dt);
 }
 
 void PolynomialPathController::Reset()

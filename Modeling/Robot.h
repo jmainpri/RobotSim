@@ -76,6 +76,8 @@ class Robot : public RobotWithGeometry
 {
 public:
   virtual std::string LinkName(int i) const;
+  ~Robot() { }
+
   bool Load(const char* fn);
   bool LoadRob(const char* fn);
   bool LoadURDF(const char* fn);
