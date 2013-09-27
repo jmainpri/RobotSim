@@ -12,7 +12,7 @@
 #include <math3d/primitives.h>
 #include "Modeling/Robot.h"
 #include "PrimitiveShape.h"
-#include "link.h"
+#include "urdf_link.h"
 using namespace std;
 using namespace Math3D;
 
@@ -20,7 +20,7 @@ class URDFLinkNode {
 public:
 	URDFLinkNode(boost::shared_ptr<urdf::Link>& link, int index, int index_parent);
 	void GetTransformations();
-	void GetGeometryProperty(bool useVisGeom=false);
+	void GetGeometryProperty();
 	void GetJoint();
 	boost::shared_ptr<urdf::Link> link;
 	int index;
@@ -51,8 +51,6 @@ public:
 
 	//The location of primitive_mesh must be provided.
 	static string primitive_mesh_path;
-	//Set this to true if visualization geometry should be used
-	static bool useVisGeom;
 };
 
 #endif /* URDFCONVERTER_H_ */
